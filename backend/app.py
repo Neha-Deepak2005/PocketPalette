@@ -265,9 +265,18 @@ def list_budgets(month: Optional[str] = None, user: User = Depends(current_user)
     budgets = db.query(Budget).filter(Budget.user_id == user.id, Budget.month == month).all()
     result = []
     for b in budgets:
+        month_start = date.fromisoformat(month + "-01")
+        if month_start.month == 12:
+            next_month = date(month_start.year + 1, 1, 1)
+        else:
+            next_month = date(month_start.year, month_start.month + 1, 1)
         spent = db.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
-            Transaction.user_id == user.id, Transaction.kind == "expense",
-            Transaction.category == b.category, func.strftime("%Y-%m", Transaction.spent_on) == month).scalar() or 0
+            Transaction.user_id == user.id,
+            Transaction.kind == "expense",
+            Transaction.category == b.category,
+            Transaction.spent_on >= month_start,
+            Transaction.spent_on < next_month
+        ).scalar() or 0
         result.append(budget_dict(b, float(spent)))
     return result
 
